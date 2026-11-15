@@ -74,9 +74,8 @@ pretest <- function(d, outcome, control, es) {
   data.table(pretrend_W = W, pretrend_p = p, max_abs_pre_t = max_t)
 }
 
-# -------------------------
+
 # One estimation run
-# -------------------------
 run_cs <- function(arm_name, outcome, control = "nevertreated", xformla = ~1) {
   keep <- arm_keep(arm_name)
   d <- panel[keep]
@@ -105,26 +104,22 @@ run_cs <- function(arm_name, outcome, control = "nevertreated", xformla = ~1) {
   list(att = att, data = d, n_hospitals = uniqueN(d$hosp_num), n_treated = n_treated)
 }
 
-# -------------------------
+
 # Coverage before estimating
-# -------------------------
 cat("\nTreated hospitals by arm and acquisition year:\n")
 print(dcast(unique(panel[arm %in% ARMS, .(id, arm, gvar)])[, .N, by = .(arm, gvar)],
             gvar ~ arm, value.var = "N", fill = 0))
 cat("\nNon-missing hospital-years per outcome and year:\n")
 print(panel[, lapply(.SD, function(x) sum(!is.na(x))), by = year, .SDcols = OUTCOMES][order(year)])
 
-# -------------------------
-# Estimate
-# -------------------------
-simple <- list(); dynamic <- list(); pre_rows <- list()
 
+# Estimate
+simple <- list(); dynamic <- list(); pre_rows <- list()
 specs <- list(
   main         = list(control = "nevertreated", xformla = ~1),
   notyettreated = list(control = "notyettreated", xformla = ~1),
   beds          = list(control = "nevertreated", xformla = ~bdtot)
 )
-
 for (spec_name in names(specs)) {
   sp <- specs[[spec_name]]
   for (a in ARMS) for (y in OUTCOMES) {
@@ -132,7 +127,6 @@ for (spec_name in names(specs)) {
     fit <- run_cs(a, y, sp$control, sp$xformla)
     if (is.null(fit)) next
     att <- fit$att
-
     s <- tryCatch(aggte(att, type = "simple", na.rm = TRUE), error = function(e) NULL)
     es_check <- tryCatch(aggte(att, type = "dynamic", min_e = -5, max_e = 5, na.rm = TRUE),
                          error = function(e) NULL)
@@ -145,11 +139,9 @@ for (spec_name in names(specs)) {
       se = s$overall.se, ci_low = s$overall.att - 1.96 * s$overall.se,
       ci_high = s$overall.att + 1.96 * s$overall.se,
       n_hospitals = fit$n_hospitals, n_treated = fit$n_treated)
-
     pre_rows[[length(pre_rows) + 1]] <- cbind(
       data.table(spec = spec_name, arm = a, outcome = y),
       pretest(fit$data, y, sp$control, es_check))
-
     if (spec_name == "main") {
       es <- es_check
       dynamic[[length(dynamic) + 1]] <- data.table(
@@ -161,7 +153,6 @@ for (spec_name in names(specs)) {
     }
   }
 }
-
 fwrite(rbindlist(simple), "output/att_simple.csv")
 fwrite(rbindlist(dynamic), "output/att_dynamic.csv")
 if (length(pre_rows)) {
@@ -169,14 +160,14 @@ if (length(pre_rows)) {
   cat("\nPre-trend checks, main specification (want large p and max |t| below about 2):\n")
   print(rbindlist(pre_rows, fill = TRUE)[spec == "main"])
 }
-
 cat("\nOverall ATT, main specification:\n")
 print(rbindlist(simple)[spec == "main"])
 cat("\nSaved results to output/\n")
 
-# -------------------------
+
 # Core thesis comparison (next step, not run here)
-# -------------------------
+
+
 # The thesis question is whether the Epic effect on SEP-1 is larger than the
 # effect on clinically driven outcomes. Comparing the two ATTs needs their
 # covariance, since they come from the same hospitals. Plan with the

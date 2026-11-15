@@ -29,21 +29,15 @@ import sys
 import pandas as pd
 import numpy as np
 
-# -------------------------
-# Settings live in config.py (shared with check_cohorts.py)
-# -------------------------
 
+# Settings live in config.py (shared with check_cohorts.py)
 from config import (EPIC_CODES, ORACLE_CODES, STANDARDIZED_SHARE,
                     MIN_MEMBERS, IT_PATH, ANNUAL_PATH, MERGER_SHARE)
-
-
 def clean_id(series):
     """Keep identifiers as strings. Drop a trailing .0 left by float reads."""
     s = series.astype("string").str.strip()
     s = s.str.replace(r"\.0$", "", regex=True)
     return s.replace({"": pd.NA, "nan": pd.NA, "<NA>": pd.NA})
-
-
 def clean_ccn(series):
     """Medicare number to 6-character CCN. Missing stays missing."""
     s = clean_id(series)
@@ -52,22 +46,17 @@ def clean_ccn(series):
     return s
 
 
-# -------------------------
 # Load
-# -------------------------
-
 it = pd.read_csv(IT_PATH, dtype=str, on_bad_lines="error")
 annual = pd.read_csv(ANNUAL_PATH, dtype=str, encoding="latin1", on_bad_lines="error")
 it.columns = it.columns.str.lower().str.strip()
 annual.columns = annual.columns.str.lower().str.strip()
-
 for name, df, needed in [("IT", it, ["id", "year", "piemr"]),
                          ("Annual", annual, ["id", "year", "sysid"])]:
     missing = [c for c in needed if c not in df.columns]
     if missing:
         sys.exit(f"{name} file is missing columns {missing}. "
                  f"Add them to the WRDS pull in 01_data_pull.py.")
-
 for df in (it, annual):
     df["id"] = clean_id(df["id"])
     df["year"] = pd.to_numeric(df["year"], errors="raise").astype(int)
@@ -75,13 +64,10 @@ for df in (it, annual):
         df["ccn"] = clean_ccn(df["mcrnum"])
 annual["sysid"] = clean_id(annual["sysid"])
 it["piemr"] = clean_id(it["piemr"])
-
 print(f"IT rows: {len(it):,}   Annual rows: {len(annual):,}")
 
-# -------------------------
-# Vendor codes present (fill EPIC_CODES / ORACLE_CODES from these)
-# -------------------------
 
+# Vendor codes present (fill EPIC_CODES / ORACLE_CODES from these)
 print("\npiemr codes found, with example text from piemro:")
 code_table = (it.groupby("piemr", dropna=False)
                 .agg(n=("id", "size"),
@@ -92,10 +78,8 @@ if not EPIC_CODES or not ORACLE_CODES:
     sys.exit("\nSTOP: fill in EPIC_CODES and ORACLE_CODES at the top of this "
              "script from the AHA codebook, then rerun.")
 
-# -------------------------
-# Uniqueness checks on the merge key
-# -------------------------
 
+# Uniqueness checks on the merge key
 for name, df in (("IT", it), ("Annual", annual)):
     n_missing = df["id"].isna().sum()
     dups = df[df["id"].notna()].duplicated(["id", "year"], keep=False)
@@ -106,13 +90,12 @@ for name, df in (("IT", it), ("Annual", annual)):
             f"data/processed/duplicates_{name.lower()}.csv", index=False)
         sys.exit(f"STOP: duplicated id-year pairs in {name}. "
                  f"See data/processed/duplicates_{name.lower()}.csv")
-
 it = it[it["id"].notna()]
 annual = annual[annual["id"].notna()]
 
-# -------------------------
+
 # Merge on AHA id + year
-# -------------------------
+
 
 # Keep every Annual Survey column (covariates included). Columns that also
 # exist in the IT Supplement get an _annual suffix in the merge.
@@ -128,9 +111,10 @@ panel["vendor"] = np.select(
     [panel["piemr"].isin(EPIC_CODES), panel["piemr"].isin(ORACLE_CODES), panel["piemr"].notna()],
     ["epic", "oracle", "other"], default=pd.NA)
 
-# -------------------------
+
 # Acquisition events from changes in sysid
-# -------------------------
+
+
 # Rules, applied to each hospital's years in order, using Annual Survey
 # years only (sysid comes from there):
 #   - The first observed year is never an acquisition (left censoring).
@@ -162,9 +146,10 @@ first_event = (events.groupby("id", as_index=False).head(1)
 first_event = first_event.merge(events.groupby("id").size().rename("n_acquisitions").reset_index(),
                                 on="id", how="left", validate="one_to_one")
 
-# -------------------------
+
 # Event type: acquisition, or a system-level merger / new system ID?
-# -------------------------
+
+
 # Compares system membership in the year before the event (t-1) with year t:
 #   new_system            the new sysid had no other members in t-1
 #                         (system formed by merger, spin-off, or re-coded ID)
@@ -196,9 +181,10 @@ def event_type(row):
 
 first_event["event_type"] = first_event.apply(event_type, axis=1)
 
-# -------------------------
+
 # Classify the acquiring system by its OTHER members' vendors
-# -------------------------
+
+
 # Uses the members already in the system the year BEFORE the acquisition,
 # which reflects the system's established EHR standard and is not diluted
 # by other hospitals acquired at the same time. Falls back to the
@@ -229,10 +215,8 @@ for _, row in first_event.iterrows():
     arms.append(arm if arm is not None else "unclassified")
 first_event["arm"] = arms
 
-# -------------------------
-# Hospital-level file, including never-acquired hospitals
-# -------------------------
 
+# Hospital-level file, including never-acquired hospitals
 hospitals = (sys_obs.groupby("id")
              .agg(first_year=("year", "min"), last_year=("year", "max"),
                   in_system_at_first_obs=("sysid", lambda s: s.iloc[0] is not pd.NA and pd.notna(s.iloc[0])))
@@ -241,18 +225,14 @@ hospitals = hospitals.merge(first_event, on="id", how="left", validate="one_to_o
 hospitals["arm"] = hospitals["arm"].fillna("never_acquired")
 hospitals["event_type"] = hospitals["event_type"].fillna("none")
 hospitals.to_csv("data/processed/acquisition_events.csv", index=False)
-
 panel = panel.merge(hospitals[["id", "acquisition_year", "arm", "event_type"]], on="id",
                     how="left", validate="many_to_one")
 assert len(panel) == rows_before, "Row count changed after attaching treatment"
 assert not panel.duplicated(["id", "year"]).any(), "Duplicate hospital-years in final panel"
-
 panel.drop(columns="_merge").to_csv("data/processed/panel_v2.csv", index=False)
-
 counts = (hospitals.groupby(["arm", "acquisition_year"], dropna=False)
           .size().rename("hospitals").reset_index())
 counts.to_csv("data/processed/cohort_counts.csv", index=False)
-
 print("\nHospitals by arm:")
 print(hospitals["arm"].value_counts().to_string())
 print("\nAcquired hospitals by event type and arm:")

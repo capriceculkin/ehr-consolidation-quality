@@ -12,18 +12,16 @@
 #
 # Requirements: pip install sqlalchemy psycopg2-binary pandas
 
-# -------------------------
-# Load required libraries
-# -------------------------
 
+# Load required libraries
 import os
 import pandas as pd
 import sqlalchemy as sa
 from getpass import getpass  # prompts for password without showing it on screen
 
-# -------------------------
+
 # Connect to WRDS
-# -------------------------
+
 
 # WRDS uses a PostgreSQL server
 # Your WRDS username is read from the WRDS_USER environment variable, or asked for
@@ -38,9 +36,9 @@ engine = sa.create_engine(
     connect_args={"sslmode": "require"}
 )
 
-# -------------------------
+
 # Pull AHA IT Supplement
-# -------------------------
+
 
 # Variables pulled:
 #   mcrnum  = Medicare Provider Number (primary linkage key to CMS data)
@@ -63,9 +61,9 @@ os.makedirs("data/raw", exist_ok=True)
 it_survey.to_csv("data/raw/aha_it_survey.csv", index=False)
 print("Saved data/raw/aha_it_survey.csv")
 
-# -------------------------
+
 # Pull AHA Annual Survey
-# -------------------------
+
 
 # Variables pulled:
 #   id      = AHA Hospital ID (join key to the IT Supplement in 02_merge_v2.py)
@@ -160,9 +158,9 @@ cover["it_ids_found_in_annual"] = [
     for y in cover.index]
 print(cover.fillna(0).astype(int).to_string())
 
-# -------------------------
+
 # Save raw files locally
-# -------------------------
+
 
 # Saving as CSV — raw unmodified pulls
 # Do not edit these files directly
@@ -172,9 +170,7 @@ annual_survey.to_csv("data/raw/aha_annual_survey.csv", index=False)
 
 print("Saved to data/raw/")
 
-# -------------------------
-# Dispose connection
-# -------------------------
 
+# Dispose connection
 engine.dispose()
 print("Done.")

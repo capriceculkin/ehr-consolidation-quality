@@ -31,9 +31,10 @@ from config import MAIN_EVENT_TYPES
 panel = pd.read_csv("data/processed/panel_v2.csv", dtype={"id": str, "ccn_it": str,
                                                           "ccn_annual": str})
 
-# -------------------------
+
 # One CCN per hospital-year
-# -------------------------
+
+
 # The CCN comes from the Annual Survey where present, else the IT Supplement.
 # Hospital-years where the two sources disagree are listed for review.
 
@@ -54,10 +55,8 @@ if dup_ccn.any():
           f"(multi-campus hospitals). These rows get no CMS outcomes, since CMS "
           f"reports one value per CCN. List saved to ccn_shared_by_multiple_ids.csv")
 
-# -------------------------
-# Outcomes: long CMS files -> one column per measure
-# -------------------------
 
+# Outcomes: long CMS files -> one column per measure
 OUTCOMES = {
     "SEP_1": "sep1",                 # documentation-dependent process measure
     "SEP_SH_3HR": "sep_shock_3hr",   # SEP-1 components: 3-hour bundles are mostly
@@ -74,6 +73,8 @@ OUTCOMES = {
     "READM_30_COPD": "readm_copd", "READM_30_CABG": "readm_cabg",
     "READM_30_HIP_KNEE": "readm_hipknee", "COMP_HIP_KNEE": "comp_hipknee",
     "EDAC_30_HF": "edac_hf", "EDAC_30_PN": "edac_pn",
+
+
     # Patient Safety Indicators: computed from billing codes, so they depend on
     # how complications and present-on-admission status are documented and coded
     "PSI_90": "psi90", "PSI_03": "psi03_ulcer", "PSI_06": "psi06_pneumothorax",
@@ -111,10 +112,8 @@ wide = (cms.pivot(index=["ccn", "measure_year"], columns="measure_id", values="v
            .rename(columns={"measure_year": "year"}))
 wide["year"] = wide["year"].astype(int)
 
-# -------------------------
-# Join outcomes to the panel
-# -------------------------
 
+# Join outcomes to the panel
 rows_before = len(panel)
 shared = (panel["ccn"].isin(panel.loc[dup_ccn[dup_ccn].index, "ccn"]) if dup_ccn.any()
           else pd.Series(False, index=panel.index))
@@ -123,9 +122,10 @@ panel = panel.merge(wide.rename(columns={"ccn": "ccn_for_join"}),
                     on=["ccn_for_join", "year"], how="left", validate="many_to_one")
 assert len(panel) == rows_before, "Row count changed when joining outcomes"
 
-# -------------------------
+
 # Payment, cost and VBP outcomes (Aim 3)
-# -------------------------
+
+
 # Built by 05b_build_cost_reports.py and 05c_stack_hvbp.py. Joined on CCN and
 # year like the CMS measures; multi-campus shared CCNs again get no values.
 FINANCE = ["drg_per_mcr_dc", "log_drg_per_mcr_dc", "op_margin", "total_margin",
@@ -153,9 +153,10 @@ except FileNotFoundError:
     print("NOTE: no hvbp_panel.csv; run 05c_stack_hvbp.py for the VBP outcome")
 assert len(panel) == rows_before, "Row count changed when joining payment outcomes"
 
-# -------------------------
+
 # Treatment timing for Callaway-Sant'Anna
-# -------------------------
+
+
 # gvar = first treated year for Epic and Oracle arms, 0 for never acquired.
 # Mixed and unclassified acquisitions are kept in the file but get gvar NA
 # and are excluded in 03_analysis.R.
@@ -186,19 +187,15 @@ assert not panel.duplicated(["id", "year"]).any(), "Duplicate hospital-years"
 
 panel.to_csv("data/processed/analysis_panel.csv", index=False)
 
-# -------------------------
-# Coverage report: what the estimator will actually have
-# -------------------------
 
+# Coverage report: what the estimator will actually have
 print("\nHospital-years with each outcome, by year:")
 present = [c for c in OUTCOMES.values() if c in panel.columns]
 print(panel.groupby("year")[present].count().to_string())
-
 print("\nHospitals by arm with at least one SEP-1 value:")
 has_sep = panel.groupby("id")["sep1"].apply(lambda s: s.notna().any()) if "sep1" in panel else None
 if has_sep is not None:
     arms = panel.drop_duplicates("id").set_index("id")["arm"]
     print(arms[has_sep[has_sep].index].value_counts().to_string())
-
 print(f"\nSaved analysis_panel.csv: {len(panel):,} hospital-years, "
       f"{panel['id'].nunique():,} hospitals")

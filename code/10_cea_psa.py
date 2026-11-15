@@ -47,7 +47,9 @@ from check_cs_estimates import cs_att, detrend   # noqa: E402
 
 REPS = 1000
 SEED = 20261101
-# ---- parameters (uniform ranges for the PSA) ----
+
+
+# parameters (uniform ranges for the PSA)
 # Life-years per death averted: upper end near remaining life expectancy at
 # age 80 (8.1 men, 9.5 women; SSA 2022 period life table, 2025 Trustees
 # Report); lower end reflects 32-41% one-year mortality after AMI, heart
@@ -91,7 +93,8 @@ if args.design == "epic_switch":
 else:
     d = panel[panel["arm"].isin(["epic", "never_acquired"]) & panel["gvar"].notna()].copy()
 
-# ---- distributional subset: safety-net status fixed before treatment ----
+
+# distributional subset: safety-net status fixed before treatment
 if args.subset:
     ms = d[["id", "year", "gvar"]].merge(panel[["id", "year", "medicaid_share"]], on=["id", "year"], how="left")
     ms = ms[(ms["gvar"] == 0) | (ms["year"] < ms["gvar"])]
@@ -103,7 +106,8 @@ if args.subset:
     print(f"Subset {args.subset}: Medicaid share cutoff {cut:.3f}; "
           f"{d.loc[d['gvar'] > 0, 'id'].nunique()} treated, {d.loc[d['gvar'] == 0, 'id'].nunique()} comparison hospitals")
 
-# ---- joint bootstrap weights: one Poisson(1) weight per hospital per draw ----
+
+# joint bootstrap weights: one Poisson(1) weight per hospital per draw
 rng = np.random.default_rng(SEED)
 units = np.sort(d["hosp_num"].unique())
 UW = pd.DataFrame(rng.poisson(1.0, size=(len(units), REPS)), index=units)
@@ -125,7 +129,8 @@ for y in MORT + READM + FIN + QUAL:
 est = pd.DataFrame(info, columns=["outcome", "estimate", "se", "n_treated", "type"])
 print(est.round(4).to_string(index=False))
 
-# ---- baselines for treated hospitals: mean of the 3 years before treatment ----
+
+# baselines for treated hospitals: mean of the 3 years before treatment
 cr = pd.read_csv(f"{P}/cost_report_panel.csv", dtype={"ccn": str})
 tr = d[d["gvar"] > 0][["id", "ccn", "year", "gvar"]].dropna(subset=["ccn"])
 pre = tr[(tr["year"] >= tr["gvar"] - 3) & (tr["year"] <= tr["gvar"] - 1)]
@@ -140,7 +145,8 @@ print("\nBaseline per treated hospital-year: total costs ${:,.0f}; Medicare DRG 
       "net patient revenue ${:,.0f}".format(base["total_costs"], base["drg"], base["net_patient_rev"]))
 print("Measured patients per year:", {k: round(v, 1) for k, v in pts.items()})
 
-# ---- PSA draws (draw 0 = point estimates with parameter midpoints) ----
+
+# PSA draws (draw 0 = point estimates with parameter midpoints)
 n = REPS + 1
 def u(lo_hi):
     v = rng.uniform(*lo_hi, size=n); v[0] = np.mean(lo_hi); return v
@@ -197,7 +203,8 @@ pd.set_option("display.width", 250)
 print(f"\n=== {tag}: per treated hospital-year, 95% intervals from {REPS} joint draws ===")
 print(S.round(3).to_string(index=False))
 
-# ---- figures: cost-effectiveness plane and acceptability curve ----
+
+# figures: cost-effectiveness plane and acceptability curve
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

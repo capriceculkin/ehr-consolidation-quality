@@ -43,13 +43,9 @@ def is_hospital_linkage(name):
     return n.endswith(".csv") and "hospital" in n and "linkage" in n and "group" not in n
 
 
-# -------------------------
 # Find hospital linkage files (loose CSVs and inside zips)
-# -------------------------
-
 frames = []
 sources = []
-
 for path in sorted(glob.glob(f"{AHRQ_DIR}/*")):
     if path.lower().endswith(".zip"):
         zyear = year_from_name(path.split("/")[-1])
@@ -62,10 +58,8 @@ for path in sorted(glob.glob(f"{AHRQ_DIR}/*")):
     elif is_hospital_linkage(path.split("/")[-1]):
         df = pd.read_csv(path, dtype=str, encoding="latin1")
         frames.append((year_from_name(path.split("/")[-1]), df)); sources.append(path)
-
 if not frames:
     sys.exit("STOP: no Compendium hospital linkage files found in datasets/AHRQ/")
-
 stacked = []
 for (year, df), src in zip(frames, sources):
     df.columns = df.columns.str.lower().str.strip()
@@ -78,22 +72,18 @@ for (year, df), src in zip(frames, sources):
     keep["year"] = year
     stacked.append(keep)
     print(f"  {year}: {len(keep):,} hospitals from {src}")
-
 comp = pd.concat(stacked, ignore_index=True)
 comp["ccn"] = comp["ccn"].str.strip().str.replace(r"\.0$", "", regex=True)
 comp["ccn"] = comp["ccn"].where(~comp["ccn"].str.fullmatch(r"\d+").fillna(False),
                                 comp["ccn"].str.zfill(6))
 comp["health_sys_id"] = comp["health_sys_id"].str.strip().replace({"": pd.NA})
-
 no_ccn = comp["ccn"].isna() | comp["ccn"].isin(["", "nan"])
 print(f"Dropping {no_ccn.sum():,} Compendium rows with no CCN (they cannot be linked to CMS or the IT Supplement)")
 comp = comp[~no_ccn]
-
 if comp.duplicated(["ccn", "year"]).any():
     n = comp.duplicated(["ccn", "year"], keep=False).sum()
     print(f"NOTE: {n} rows share a CCN within a year. Keeping the first.")
     comp = comp.drop_duplicates(["ccn", "year"], keep="first")
-
 years_found = sorted(comp["year"].unique())
 print(f"\nCompendium years found: {years_found}")
 for want in (2016, 2018, 2020, 2021, 2022, 2023):
@@ -101,22 +91,20 @@ for want in (2016, 2018, 2020, 2021, 2022, 2023):
         print(f"  MISSING {want}: download the {want} hospital linkage file from AHRQ "
               f"into datasets/AHRQ/")
 
-# -------------------------
-# CCN -> AHA id crosswalk from the IT Supplement
-# -------------------------
 
+# CCN -> AHA id crosswalk from the IT Supplement
 it = pd.read_csv(IT_PATH, dtype=str)
 it.columns = it.columns.str.lower()
 it["id"] = it["id"].str.strip().str.replace(r"\.0$", "", regex=True)
 it["ccn"] = it["mcrnum"].str.strip().str.replace(r"\.0$", "", regex=True)
 it["ccn"] = it["ccn"].where(~it["ccn"].str.fullmatch(r"\d+").fillna(False), it["ccn"].str.zfill(6))
 xw = it.dropna(subset=["id", "ccn"])[["ccn", "id"]].drop_duplicates()
-
 multi_id = xw.groupby("ccn")["id"].nunique()
 multi_ccn = xw.groupby("id")["ccn"].nunique()
 print(f"\nCrosswalk: {len(xw):,} CCN-id pairs, "
       f"{(multi_id > 1).sum()} CCNs with more than one AHA id, "
       f"{(multi_ccn > 1).sum()} AHA ids with more than one CCN over time")
+
 
 # A CCN shared by several AHA ids (multi-campus) cannot be assigned to one
 # hospital, so those CCNs are dropped and listed.

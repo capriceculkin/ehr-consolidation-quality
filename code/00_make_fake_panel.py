@@ -28,7 +28,7 @@ EPIC_SEP1_EFFECT = -3.0
 ORACLE_SEP1_EFFECT = -2.0
 
 
-# Hospitals ----
+# Hospitals
 # One row per hospital: its arm, how it joined a system, when, and fixed traits.
 
 arm = rng.choice(["never_acquired", "epic", "oracle", "mixed", "unclassified"],
@@ -70,13 +70,14 @@ in_sys = (((hosp["arm"] == "never_acquired") & (rng.random(N_HOSP) < 0.6))
 hosp["base_sysid"] = np.where(in_sys, [f"S{rng.integers(1, 300):03d}" for _ in range(N_HOSP)], None)
 
 
-# Hospital-years ----
+# Hospital-years
 # Expand to one row per hospital per year it is observed.
 
 panel = hosp.merge(pd.DataFrame({"year": YEARS}), how="cross")
 panel = panel[panel["year"] >= panel["first_year"]].copy()
 
-# Treatment timing ----
+
+# Treatment timing
 # gvar is the acquisition year for Epic and Oracle hospitals that joined in
 # one of the main event types, 0 for never acquired, and missing for the rest.
 main = panel["event_type"].isin(["independent_joined", "hospital_moved"])
@@ -93,7 +94,7 @@ panel["sysid"] = np.where(after, "A" + panel["hosp_num"].astype(str).str.zfill(4
                           panel["base_sysid"])
 
 
-# Vendor ----
+# Vendor
 # Acquired Epic and Oracle hospitals move to their system's vendor the year
 # after acquisition. A few never-acquired hospitals switch to Epic on their own.
 # The IT Supplement has no 2021 survey, so vendor is missing that year.
@@ -108,7 +109,7 @@ vendor[panel["year"] == 2021] = np.nan
 panel["vendor"] = vendor
 
 
-# Outcomes ----
+# Outcomes
 # SEP-1 starts in 2017 and rises over time. The built-in effects above are
 # added in event years 0 and 1. Mortality is reported every year except 2020
 # and has no built-in effect.
@@ -127,7 +128,7 @@ for m in ["mort_ami", "mort_hf", "mort_pn"]:
 panel.loc[panel["year"] < 2014, ["cntrl", "cbsatype"]] = np.nan
 
 
-# Save ----
+# Save
 
 cols = ["id", "hosp_num", "ccn", "year", "sysid", "arm", "event_type", "acquisition_year", "gvar",
         "vendor", "medicare_share", "medicaid_share", "bdtot", "cntrl", "cbsatype",

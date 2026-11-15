@@ -51,14 +51,14 @@ hosp["group"] = np.select(
     ["Acquired: " + hosp["arm"].astype(str), "Never acquired"], default=OTHER)
 panel["group"] = panel["id"].map(hosp["group"])
 
-# -------------------------
+
 # 1. Timing: acquisitions by year and arm, and Epic switches by year
-# -------------------------
 acq = hosp[hosp["arm"].isin(TREATED_ARMS + ["mixed"]) & hosp["event_type"].isin(MAIN_EVENT_TYPES)
            & hosp["acquisition_year"].notna()]
 acq_counts = (acq.groupby(["acquisition_year", "arm"]).size().rename("n").reset_index()
               .rename(columns={"acquisition_year": "year"}))
 acq_counts["series"] = "Acquisition: " + acq_counts["arm"]
+
 
 # Epic switch: first year the vendor is Epic after a non-Epic year, never in a
 # hospital's first observed year (same rule as 07_extensions.py, EXT 1)
@@ -81,9 +81,8 @@ ax.set(xlabel="Year", ylabel="Hospitals", title="Acquisitions by arm and switche
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=3, frameon=False)
 plt.tight_layout(); plt.savefig(f"{OUT}/1_timing.png", dpi=200); plt.close()
 
-# -------------------------
+
 # 2. Attrition: hospitals observed, entering, and leaving each year
-# -------------------------
 span = panel.groupby("id")["year"].agg(first="min", last="max")
 yrs = sorted(panel["year"].unique())
 rows = []
@@ -96,10 +95,11 @@ for y in yrs:
                  if "sep1" in panel else np.nan})
 attr = pd.DataFrame(rows)
 attr.to_csv(f"{OUT}/2_attrition.csv", index=False)
-
 tr = span.join(hosp[["group", "gvar"]])
 tr = tr[tr["group"].str.startswith("Acquired")].copy()
 tr["years_after"] = tr["last"] - tr["gvar"]
+
+
 # Hospitals acquired in the last two panel years cannot be followed for 2 years,
 # so they are left out of the drop-out share (otherwise it just counts late acquisitions)
 tr["can_follow_2y"] = tr["gvar"] <= yrs[-1] - 2
@@ -116,16 +116,16 @@ ax.set(xlabel="Year", ylabel="Hospitals", title="Panel size, entry, exit, and SE
 ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.15), ncol=4, frameon=False)
 plt.tight_layout(); plt.savefig(f"{OUT}/2_attrition.png", dpi=200); plt.close()
 
-# -------------------------
+
 # 3. Baseline characteristics by arm
 #    Acquired: the year before acquisition. Comparison: first observed year.
-# -------------------------
 print("\nRaw codes, check these before trusting the recodes below:")
 for c in ["cbsatype", "cntrl"]:
     if c in panel:
         print(f"{c}:\n" + panel[c].value_counts(dropna=False).sort_index().to_string())
-
 b = panel[panel["group"] != OTHER].copy()
+
+
 # Acquired hospitals: the year before acquisition.
 # Never-acquired hospitals: the year closest to the treated hospitals' median
 # baseline year in which the AHA characteristics are reported. Using their first
@@ -182,17 +182,15 @@ print("\nHospitals without a baseline row (first observed at or after acquisitio
 chars.to_csv(f"{OUT}/3_characteristics.csv")
 print("\nBaseline characteristics by arm:\n" + chars.to_string())
 
-# -------------------------
+
 # 4. Unadjusted outcome trends
 #    (a) by calendar year, acquired arms vs never acquired
 #    (b) by years since acquisition, acquired arms only
-# -------------------------
 outs = [o for o in OUTCOMES if o in panel]
 long = (panel[panel["group"] != OTHER]
         .melt(id_vars=["id", "year", "group", "gvar"], value_vars=outs,
               var_name="outcome", value_name="value").dropna(subset=["value"]))
 long["outcome"] = long["outcome"].map(OUTCOMES)
-
 def facet_plot(df, x, title, xlabel, path, vline=None):
     fig, axes = plt.subplots(2, 2, figsize=(11, 8), squeeze=False)
     for ax, (name, d) in zip(axes.flat, df.groupby("outcome")):
@@ -207,13 +205,11 @@ def facet_plot(df, x, title, xlabel, path, vline=None):
     fig.legend(h, l, loc="lower center", ncol=3, frameon=False)
     fig.suptitle(title)
     plt.tight_layout(rect=(0, 0.05, 1, 0.96)); plt.savefig(path, dpi=200); plt.close()
-
 cal = (long.groupby(["group", "outcome", "year"])["value"]
        .agg(mean="mean", hospitals="size").reset_index())
 cal.to_csv(f"{OUT}/4_trends_calendar.csv", index=False)
 facet_plot(cal, "year", "Outcomes by calendar year: acquired hospitals vs never acquired (unadjusted)",
            "Year", f"{OUT}/4_trends_calendar.png")
-
 ev = long[long["group"].str.startswith("Acquired") & (long["gvar"] > 0)].copy()
 ev["event_time"] = ev["year"] - ev["gvar"]
 ev = ev[ev["event_time"].between(-5, 5)]
@@ -222,5 +218,4 @@ ev = (ev.groupby(["group", "outcome", "event_time"])["value"]
 ev.to_csv(f"{OUT}/4_trends_event.csv", index=False)
 facet_plot(ev, "event_time", "Outcomes around acquisition, acquired hospitals only (unadjusted)",
            "Years since acquisition", f"{OUT}/4_trends_event.png", vline=-0.5)
-
 print(f"\nDone. Files in {OUT}/")

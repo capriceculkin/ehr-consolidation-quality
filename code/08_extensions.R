@@ -91,7 +91,8 @@ main_outcomes <- c("sep1", "sep_shock_3hr", "sep_sev_3hr", "sep_shock_6hr", "sep
                    "mort_ami", "mort_hf", "mort_pn", "readm_ami", "readm_hf", "readm_pn",
                    "log_drg_per_mcr_dc", "drg_per_mcr_dc", "op_margin", "total_margin", "log_total_costs", "cost_per_dc", "mcr_dc_share", "vbp_tps", "log_charges_per_dc", "log_markup", "log_npr_per_dc", "discount_share", "fte_per_bed", "log_total_dc", "log_cost_per_dc", "outlier_per_mcr_dc", "outlier_share", "bad_debt_share", "charity_share")
 
-# ---- EXT 1: software vs owner ----
+
+# EXT 1: software vs owner
 for (g in c("switch_only", "acq_and_switch", "acq_no_switch")) {
   f <- file.path(P, sprintf("ext1_%s.csv", g))
   if (!file.exists(f)) next
@@ -102,7 +103,8 @@ for (g in c("switch_only", "acq_and_switch", "acq_no_switch")) {
   }
 }
 
-# ---- EXT 2: homogenization (acquired hospitals only, not-yet-acquired as comparison) ----
+
+# EXT 2: homogenization (acquired hospitals only, not-yet-acquired as comparison)
 f <- file.path(P, "ext2_converge.csv")
 if (file.exists(f)) {
   d <- fread(f)
@@ -112,7 +114,8 @@ if (file.exists(f)) {
   }
 }
 
-# ---- EXT 3: data exchange ----
+
+# EXT 3: data exchange
 f <- file.path(P, "ext3_exchange.csv")
 if (file.exists(f)) {
   d <- fread(f)
@@ -126,7 +129,8 @@ if (file.exists(f)) {
   }
 }
 
-# ---- EXT 4: SEP-1 reporting ----
+
+# EXT 4: SEP-1 reporting
 f <- file.path(P, "ext4_reporting.csv")
 if (file.exists(f)) {
   d <- fread(f)
